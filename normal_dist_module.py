@@ -567,3 +567,135 @@ def get_next_nd_question():
 
 # --- START OF MODULE WRAPPER ---
 def run_app():
+    st.markdown(
+        """
+        <style>
+        button[kind="primary"] { background-color: #007AFF !important; border-color: #007AFF !important; color: white !important; }
+        button[kind="primary"]:hover { background-color: #0056b3 !important; border-color: #0056b3 !important; }
+        div[data-testid="stElementContainer"]:has(#next-problem-btn) + div[data-testid="stElementContainer"] button {
+            background-color: #28a745 !important; border-color: #28a745 !important; color: white !important;
+        }
+        div[data-testid="stElementContainer"]:has(#next-problem-btn) + div[data-testid="stElementContainer"] button:hover {
+            background-color: #218838 !important; border-color: #218838 !important;
+        }
+        </style>
+        """,
+        unsafe_allow_html=True,
+    )
+
+    # Initialize isolated nd_ state variables
+    if "nd_generating" not in st.session_state:
+        st.session_state.nd_generating = True
+    if "nd_pdf_bytes" not in st.session_state:
+        st.session_state.nd_pdf_bytes = None
+    if "nd_suite_refresh_id" not in st.session_state:
+        st.session_state.nd_suite_refresh_id = 0
+    if "nd_selection_mode" not in st.session_state:
+        st.session_state.nd_selection_mode = "Random"
+    if "nd_focus" not in st.session_state:
+        st.session_state.nd_focus = "All"
+    if "nd_show_curve" not in st.session_state:
+        st.session_state.nd_show_curve = False
+    if "nd_quiz_active" not in st.session_state:
+        st.session_state.nd_quiz_active = False
+    if "nd_questions_answered" not in st.session_state:
+        st.session_state.nd_questions_answered = 0
+    if "nd_quiz_score" not in st.session_state:
+        st.session_state.nd_quiz_score = 0
+    if "nd_quiz_completed" not in st.session_state:
+        st.session_state.nd_quiz_completed = False
+
+    st.title("Normal Distributions 📊")
+
+    col_actions, col_set = st.columns([5, 1])
+    with col_actions:
+        with st.popover("📄 Worksheet Actions", use_container_width=True):
+            if st.session_state.nd_pdf_bytes is None:
+                if st.button("⚙️ Generate 12-Question PDF", use_container_width=True, key="nd_gen_pdf"):
+                    with st.spinner("Compiling PDF..."):
+                        st.session_state.nd_pdf_bytes = create_nd_pdf_bytes(st.session_state.nd_focus)
+                    st.rerun()
+            else:
+                timestamp = datetime.now().strftime("%Y%m%d%H%M%S")
+                st.download_button(
+                    "⬇️ Download Worksheet",
+                    data=st.session_state.nd_pdf_bytes,
+                    file_name=f"Normal_Distributions_{timestamp}.pdf",
+                    mime="application/pdf",
+                    use_container_width=True,
+                    type="primary",
+                    key="nd_dl_pdf",
+                )
+
+    with col_set:
+        with st.popover("⚙️", use_container_width=True):
+            st.radio(
+                "Selection Mode",
+                ["Random", "Cyclical", "Rehearse", "Quiz"],
+                key="nd_selection_mode",
+                on_change=handle_nd_settings_change,
+            )
+            st.selectbox(
+                "Question Focus",
+                [
+                    "All",
+                    "Z-Scores",
+                    "Probabilities (%)",
+                    "Inverse Normal (Find X)",
+                    "Mean & Std Dev",
+                    "Expected Value",
+                ],
+                key="nd_focus",
+                on_change=handle_nd_settings_change,
+            )
+            st.toggle(
+                "Overlay Normal Curve",
+                key="nd_show_curve",
+                on_change=lambda: st.session_state.update(
+                    nd_problem_image=draw_normal_problem_image(
+                        st.session_state.nd_problem_data,
+                        show_curve=st.session_state.nd_show_curve,
+                    )
+                )
+                if "nd_problem_data" in st.session_state
+                else None,
+            )
+            st.radio(
+                "Camera Mode",
+                ["None", "App", "Native"],
+                key="nd_camera_mode",
+                horizontal=True,
+                on_change=handle_nd_settings_change,
+            )
+            st.toggle(
+                "Canvas Controls",
+                key="nd_show_controls",
+                on_change=handle_nd_settings_change,
+            )
+
+    # Quiz Mode Start / Completion Gate
+    if st.session_state.nd_selection_mode == "Quiz" and not st.session_state.nd_quiz_active:
+        if st.session_state.nd_quiz_completed:
+            st.success(f"🎉 Quiz Complete! You completed {st.session_state.nd_questions_answered} questions.")
+            if st.button("Restart Quiz", use_container_width=True, key="nd_restart_quiz"):
+                handle_nd_settings_change()
+                st.rerun()
+            return
+
+        st.info("Ready to test your Normal Distribution skills? This quiz covers all selected question types.")
+        if st.button("🚀 Start Quiz", use_container_width=True, type="primary", key="nd_start_quiz"):
+            st.session_state.nd_quiz_active = True
+            st.session_state.nd_questions_answered = 0
+            st.session_state.nd_generating = True
+            st.rerun()
+        return
+
+    if st.session_state.nd_selection_mode == "Quiz" and st.session_state.nd_quiz_active:
+        st.caption(f"Question **{st.session_state.nd_questions_answered + 1}**")
+        st.divider()
+
+    # Generate problem & image
+    if st.session_state.nd_generating or "nd_problem_data" not in st.session_state:
+        st.session_state.nd_generating = True
+        with st.spinner("Generating distribution..."):
+            p
