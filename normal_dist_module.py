@@ -698,4 +698,45 @@ def run_app():
     if st.session_state.nd_generating or "nd_problem_data" not in st.session_state:
         st.session_state.nd_generating = True
         with st.spinner("Generating distribution..."):
-            p
+            p_data = get_next_nd_question()
+            if p_data is None:
+                st.session_state.nd_quiz_active = False
+                st.rerun()
+
+            st.session_state.nd_problem_data = p_data
+            st.session_state.nd_problem_image = draw_normal_problem_image(
+                p_data,
+                show_curve=st.session_state.get("nd_show_curve", False),
+                width_px=420,
+                height_px=480,
+            )
+            st.session_state.nd_generating = False
+            st.rerun()
+    else:
+        p_data = st.session_state.nd_problem_data
+        bg_image = st.session_state.nd_problem_image
+
+        problem_context = (
+            f"NCEA Level 2 Normal Distribution Question:\n{p_data['text']}\n"
+            f"Grading Rule: {p_data['grading_rule']}"
+        )
+
+        ai_marking_component.render_grading_suite(
+            bg_image=bg_image,
+            height_px=480,
+            key_prefix=f"nd_suite_{st.session_state.nd_suite_refresh_id}",
+            solution_requirement="general",
+            problem_context=problem_context,
+            show_controls=st.session_state.get("nd_show_controls", False),
+            camera_mode=st.session_state.get("nd_camera_mode", "App"),
+        )
+
+        st.markdown('<div id="next-problem-btn"></div>', unsafe_allow_html=True)
+        if st.button("Next Question", use_container_width=True, key="nd_next_btn"):
+            if st.session_state.nd_selection_mode == "Cyclical":
+                st.session_state.nd_question_queue.append(p_data["qtype"])
+            if st.session_state.nd_selection_mode == "Quiz":
+                st.session_state.nd_questions_answered += 1
+            st.session_state.nd_generating = True
+            st.session_state.nd_suite_refresh_id += 1
+            st.rerun()
